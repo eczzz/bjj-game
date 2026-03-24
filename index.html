@@ -181,10 +181,18 @@ graph TD
     HH --> SC
     DEC1 -->|"Clean pass"| SC
 
-    %% Long Step TBD
-    LS["Long Step"]:::tbd
-    HQ -.->|"TBD"| LS
-    LS -.-> SC
+    %% Long Step branch
+    LS["Long Step"]:::transition
+    HQ --> LS
+
+    DEC2{"Underhook?"}:::decision
+    LS --> DEC2
+
+    DEC2 -->|"No underhook"| SC
+    
+    LSXP["Crossface &<br/>Sprawl"]:::transition
+    DEC2 -->|"They underhook"| LSXP
+    LSXP --> SC
 
     %% Side Control path
     HUNDO["100 Kilos"]:::position
@@ -233,7 +241,7 @@ graph TD
   <button id="reset-btn" onclick="resetZoom()">⟲ Reset Zoom</button>
 
   <footer>
-    Last updated: March 20, 2026 · Built with 🦉 by Owlbert
+    Last updated: March 24, 2026 · Built with 🦉 by Owlbert
   </footer>
 
   <!-- Mermaid.js -->
