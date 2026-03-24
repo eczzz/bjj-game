@@ -71,15 +71,53 @@
     .legend-dot.decision { background: #d29922; }
     .legend-dot.tbd { background: #30363d; border: 1px dashed #8b949e; }
 
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px 16px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #8b949e;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .tab-btn:hover {
+      color: #e6edf3;
+      background: #1c2128;
+    }
+
+    .tab-btn.active {
+      color: #58a6ff;
+      border-bottom-color: #58a6ff;
+    }
+
     /* Diagram container */
-    #diagram-container {
+    .diagram-container {
       flex: 1;
       overflow: hidden;
       position: relative;
       touch-action: none;
+      display: none;
     }
 
-    #diagram-wrapper {
+    .diagram-container.active {
+      display: block;
+    }
+
+    .diagram-wrapper {
       display: inline-block;
       padding: 40px;
       min-width: 100%;
@@ -158,8 +196,13 @@
     <div class="legend-item"><div class="legend-dot tbd"></div> TBD</div>
   </div>
 
-  <div id="diagram-container">
-    <div id="diagram-wrapper">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('top')">⬆️ Top Game</button>
+    <button class="tab-btn" onclick="switchTab('bottom')">⬇️ Bottom Game</button>
+  </div>
+
+  <div id="top-container" class="diagram-container active">
+    <div id="top-wrapper" class="diagram-wrapper">
       <pre class="mermaid">
 graph TD
     START["🥋 Top Player vs.<br/>Seated/Supine"]:::position
@@ -238,6 +281,60 @@ graph TD
     </div>
   </div>
 
+  <div id="bottom-container" class="diagram-container">
+    <div id="bottom-wrapper" class="diagram-wrapper">
+      <pre class="mermaid">
+graph TD
+    BSTART["🥋 Bottom Player vs.<br/>Loose Passer (Open Guard)"]:::position
+
+    STS["Shin to Shin"]:::position
+    BSTART --> STS
+
+    SLX["Single Leg X"]:::position
+    STS --> SLX
+
+    DEC3{"Sweep<br/>blocked?"}:::decision
+    SLX --> DEC3
+
+    %% Clean sweep path
+    SWEEP["Sweep ✅"]:::transition
+    DEC3 -->|"Clean sweep"| SWEEP
+
+    ANKL(("Ankle Lock")):::submission
+    SWEEP --> ANKL
+
+    CBDY["Cross Body"]:::transition
+    SWEEP --> CBDY
+
+    IHH(("Inside Heel Hook")):::submission
+    CBDY --> IHH
+
+    HHOL["Honey Hole"]:::position
+    CBDY --> HHOL
+
+    %% Blocked — transition to X Guard
+    XG["X Guard"]:::position
+    DEC3 -->|"Blocked"| XG
+
+    TRIP["Tripod Sweep"]:::transition
+    XG --> TRIP
+
+    RXG["Reverse X Guard"]:::position
+    XG --> RXG
+
+    SADL["Saddle"]:::position
+    RXG --> SADL
+
+    %% Style classes
+    classDef position fill:#2ea043,stroke:#3fb950,color:#fff,stroke-width:2px
+    classDef submission fill:#da3633,stroke:#f85149,color:#fff,stroke-width:3px
+    classDef transition fill:#1f6feb,stroke:#58a6ff,color:#fff,stroke-width:2px
+    classDef decision fill:#9e6a03,stroke:#d29922,color:#fff,stroke-width:2px
+    classDef tbd fill:#21262d,stroke:#484f58,color:#8b949e,stroke-width:2px,stroke-dasharray: 5 5
+      </pre>
+    </div>
+  </div>
+
   <button id="reset-btn" onclick="resetZoom()">⟲ Reset Zoom</button>
 
   <footer>
@@ -276,47 +373,62 @@ graph TD
       }
     });
 
-    let panzoomInstance = null;
+    const panzoomInstances = {};
+    let activeTab = 'top';
 
     function resetZoom() {
-      if (panzoomInstance) {
-        panzoomInstance.reset();
+      if (panzoomInstances[activeTab]) {
+        panzoomInstances[activeTab].reset();
       }
     }
 
-    // Initialize panzoom after mermaid renders
-    mermaid.run().then(() => {
-      const wrapper = document.getElementById('diagram-wrapper');
-      const container = document.getElementById('diagram-container');
+    function switchTab(tab) {
+      activeTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.diagram-container').forEach(c => c.classList.remove('active'));
+      document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`).classList.add('active');
+      document.getElementById(`${tab}-container`).classList.add('active');
 
-      panzoomInstance = Panzoom(wrapper, {
+      // Init panzoom for this tab if not yet done
+      if (!panzoomInstances[tab]) {
+        initPanzoom(tab);
+      }
+    }
+
+    function initPanzoom(tab) {
+      const wrapper = document.getElementById(`${tab}-wrapper`);
+      const container = document.getElementById(`${tab}-container`);
+
+      panzoomInstances[tab] = Panzoom(wrapper, {
         maxScale: 5,
         minScale: 0.3,
         contain: false,
         canvas: true
       });
 
-      // Mouse wheel zoom
       container.addEventListener('wheel', (event) => {
         event.preventDefault();
-        panzoomInstance.zoomWithWheel(event);
+        panzoomInstances[tab].zoomWithWheel(event);
       }, { passive: false });
 
-      // Center the diagram initially
       requestAnimationFrame(() => {
         const svg = wrapper.querySelector('svg');
         if (svg) {
           svg.style.maxWidth = 'none';
           svg.style.height = 'auto';
-          // Give it a reasonable size
           const svgWidth = svg.getBoundingClientRect().width;
           const containerWidth = container.getBoundingClientRect().width;
           if (svgWidth > containerWidth) {
             const scale = containerWidth / svgWidth * 0.9;
-            panzoomInstance.zoom(scale, { animate: false });
+            panzoomInstances[tab].zoom(scale, { animate: false });
           }
         }
       });
+    }
+
+    // Initialize panzoom after mermaid renders
+    mermaid.run().then(() => {
+      initPanzoom('top');
     });
   </script>
 
